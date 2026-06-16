@@ -1,0 +1,12 @@
+#ifndef WIFI_CONFIG_H
+#define WIFI_CONFIG_H
+
+#define WIFI_SSID     "tu-ssid"
+#define WIFI_PASSWORD "tu-password"
+
+#define LOCAL_IP      192,168,0,XXX
+#define GATEWAY       192,168,0,1
+#define SUBNET        255,255,255,0
+#define DNS_PRIMARY   8,8,8,8
+
+#endif
