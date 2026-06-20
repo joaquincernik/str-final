@@ -69,6 +69,6 @@ void adsTask(void *pvParams) {
 
         logPrintln("Tensión: " + String(data.voltaje, 1) + "V, Corriente: " + String(data.corriente, 3) + "A");
 
-        vTaskDelay(pdMS_TO_TICKS(120));
+        vTaskDelay(pdMS_TO_TICKS(920));
     }
 }
