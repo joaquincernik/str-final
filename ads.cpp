@@ -4,58 +4,45 @@
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 
-#define SENSITIVITY     680.0f
+#define SENSITIVITY      680.0f
 #define FACTOR_CORRIENTE 11.1f
 
 static Adafruit_ADS1115 ads;
 
 void initAds() {
     Wire.begin(15, 14);
+    Wire.setClock(400000);
     delay(10);
+
     if (!ads.begin(0x48)) {
         logPrintln("ERROR: ADS1115 no detectado en 0x48");
     } else {
         logPrintln("ADS1115 detectado en 0x48");
         ads.setGain(GAIN_TWOTHIRDS);
         ads.setDataRate(RATE_ADS1115_860SPS);
-        logPrintln("ADS1115: PGA ±4.096V, 860SPS");
+        logPrintln("ADS1115: PGA ±6.144V, 860SPS");
     }
 }
 
-static float leerTensionRMS() {
-    float Vsum = 0.0f;
-    for (int i = 0; i < 25; i++) {
-        Vsum += ads.computeVolts(ads.readADC_SingleEnded(0));
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
-    float zeroPoint = Vsum / 25.0f;
-
-    double sum_sq = 0.0;
-    for (int i = 0; i < 25; i++) {
-        float v = ads.computeVolts(ads.readADC_SingleEnded(0)) - zeroPoint;
-        sum_sq += (double)(v * v);
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
-
-    float rms_pin = sqrtf((float)(sum_sq / 25.0));
-    return rms_pin * SENSITIVITY;
-}
-
-static float calcular_RMS(uint8_t canal) {
+static float calcular_Canal_RMS(uint8_t canal) {
     float suma = 0.0f;
     float suma_cuadrados = 0.0f;
-    const int muestras = 42;
+    uint32_t conteo_muestras = 0;
 
-    for (int i = 0; i < muestras; i++) {
+    uint32_t tiempo_inicio = millis();
+    while ((millis() - tiempo_inicio) < 40) {
         float v = ads.computeVolts(ads.readADC_SingleEnded(canal));
         suma += v;
         suma_cuadrados += v * v;
-        vTaskDelay(pdMS_TO_TICKS(12));
+        conteo_muestras++;
     }
 
-    float media = suma / muestras;
-    float varianza = (suma_cuadrados / muestras) - (media * media);
+    if (conteo_muestras == 0) return 0.0f;
+
+    float media = suma / conteo_muestras;
+    float varianza = (suma_cuadrados / conteo_muestras) - (media * media);
     if (varianza < 0.0f) varianza = 0.0f;
+
     return sqrtf(varianza);
 }
 
@@ -65,20 +52,23 @@ void adsTask(void *pvParams) {
     static float corriente_filt = 0.0f;
 
     while (1) {
-        float tension_instantanea = leerTensionRMS();
+        float rms_sensor_V = calcular_Canal_RMS(0);
+        float tension_instantanea = rms_sensor_V * SENSITIVITY;
 
-        float rms_sensor_A = calcular_RMS(1);
+        float rms_sensor_A = calcular_Canal_RMS(1);
         float corriente_instantanea = rms_sensor_A * FACTOR_CORRIENTE;
 
         voltaje_filt = 0.8f * voltaje_filt + 0.2f * tension_instantanea;
         corriente_filt = 0.8f * corriente_filt + 0.2f * corriente_instantanea;
 
-        if (corriente_filt < 0.008f) corriente_filt = 0.0f;
+        if (corriente_filt < 0.05f) corriente_filt = 0.0f;
 
         data.voltaje = voltaje_filt;
         data.corriente = corriente_filt;
         xQueueSend(adsDataQueue, &data, 0);
+
         logPrintln("Tensión: " + String(data.voltaje, 1) + "V, Corriente: " + String(data.corriente, 3) + "A");
 
+        vTaskDelay(pdMS_TO_TICKS(120));
     }
 }
