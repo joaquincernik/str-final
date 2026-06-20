@@ -1,4 +1,5 @@
 #include "wifi_config.h"
+#include <WiFi.h>
 
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
@@ -6,6 +7,8 @@
 #include "shared.h"
 #include "logging.h"
 #include "tasks.h"
+#include "mqtt.h"
+#include "ads.h"
 #include "esp_camera.h"
 
 static camera_config_t cameraConfig = {
@@ -74,15 +77,15 @@ static void initCamera() {
     led_duty = CONFIG_LED_MAX_INTENSITY;
     logPrintln("LED flash configurado");
 
-    startCameraServer();
-    logPrintln("Servidor HTTP de cámara iniciado");
+    /*startCameraServer();
+    logPrintln("Servidor HTTP de cámara iniciado");*/
 }
 
 static void sendInitialState() {
-    pinMode(SENSOR_PIN, INPUT_PULLUP);
     int initialState = digitalRead(SENSOR_PIN);
     sensor_event_t initEvt = { (uint8_t)initialState, millis() };
     xQueueSend(sensorEventQueue, &initEvt, portMAX_DELAY);
+    xQueueSend(mqttEventQueue, &initEvt, portMAX_DELAY);
 }
 
 void setup() {
@@ -92,7 +95,11 @@ void setup() {
     initWiFi();
     initCamera();
     initTelnetServer();
+    initAds();
+    pinMode(SENSOR_PIN, INPUT_PULLUP);
+    logPrintln("Sensor GPIO configurado como INPUT_PULLUP");
     createRtTasks();
+    initMqtt();
     sendInitialState();
 
     vTaskDelete(NULL);

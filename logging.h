@@ -1,7 +1,7 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
-#include <WiFi.h>
+#include <Arduino.h>
 
 void logPrint(const String &msg);
 void logPrintln(const String &msg);

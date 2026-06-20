@@ -9,4 +9,9 @@
 #define SUBNET        255,255,255,0
 #define DNS_PRIMARY   8,8,8,8
 
+#define MQTT_BROKER     "cernikiw3.chickenkiller.com"
+#define MQTT_PORT       1883
+#define MQTT_TOPIC      "estado-puerta"
+#define MQTT_CLIENT_ID  "esp32-cam-puerta"
+
 #endif

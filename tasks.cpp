@@ -2,6 +2,7 @@
 #include "shared.h"
 #include "logging.h"
 #include "app_httpd.h"
+#include "ads.h"
 #include "esp_camera.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -9,6 +10,8 @@
 SemaphoreHandle_t sensorSemaphore = NULL;
 QueueHandle_t sensorEventQueue = NULL;
 QueueHandle_t captureQueue = NULL;
+QueueHandle_t mqttEventQueue = NULL;
+QueueHandle_t adsDataQueue = NULL;
 
 static void IRAM_ATTR sensor_isr() {
     BaseType_t higherTaskWoken = pdFALSE;
@@ -21,18 +24,23 @@ static void IRAM_ATTR sensor_isr() {
 static void sensorTask(void *pvParams) {
     sensor_event_t evt;
     uint32_t lastValidTime = 0;
+    int lastState = -1;
 
     while (1) {
         if (xSemaphoreTake(sensorSemaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
             uint32_t now = millis();
-            if (now - lastValidTime < 50) continue;
+            if (now - lastValidTime < 200) continue;
             lastValidTime = now;
 
             evt.state = digitalRead(SENSOR_PIN);
+            if (evt.state == lastState) continue;
+            lastState = evt.state;
+
             evt.timestamp_ms = now;
             if (xQueueSend(sensorEventQueue, &evt, pdMS_TO_TICKS(100)) != pdTRUE) {
                 logPrintln("WARN: sensorEventQueue llena, descartando evento");
             }
+            xQueueSend(mqttEventQueue, &evt, pdMS_TO_TICKS(100));
         }
     }
 }
@@ -77,14 +85,6 @@ static void httpTask(void *pvParams) {
     camera_fb_t *fb;
     const char *boundary = "----ESP32CAM";
     const char *url = "https://cernikiw3.chickenkiller.com/foto";
-    const char *host = "cernikiw3.chickenkiller.com";
-
-    IPAddress resolved;
-    if (!WiFi.hostByName(host, resolved)) {
-        logPrintln("WARN: No se pudo resolver DNS para " + String(host));
-    } else {
-        logPrintln("DNS: " + String(host) + " -> " + resolved.toString());
-    }
 
     while (1) {
         if (xQueueReceive(captureQueue, &fb, portMAX_DELAY) == pdTRUE) {
@@ -120,7 +120,7 @@ static void httpTask(void *pvParams) {
                 http.begin(client, url);
                 http.setTimeout(15000);
                 http.addHeader("Content-Type", "multipart/form-data; boundary=" + String(boundary));
-                httpCode = http.POST(body, bodyLen);
+                httpCode = http.sendRequest("POST", body, bodyLen);
 
                 if (httpCode > 0) {
                     String response = http.getString();
@@ -140,8 +140,10 @@ static void httpTask(void *pvParams) {
 
 void createRtTasks() {
     sensorSemaphore = xSemaphoreCreateBinary();
-    sensorEventQueue = xQueueCreate(10, sizeof(sensor_event_t));
+    sensorEventQueue = xQueueCreate(20, sizeof(sensor_event_t));
     captureQueue = xQueueCreate(10, sizeof(camera_fb_t *));
+    mqttEventQueue = xQueueCreate(5, sizeof(sensor_event_t));
+    adsDataQueue = xQueueCreate(5, sizeof(ads_data_t));
 
     attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), sensor_isr, CHANGE);
     logPrintln("Interrupción GPIO configurada");
@@ -150,5 +152,6 @@ void createRtTasks() {
     xTaskCreatePinnedToCore(captureTask, "CaptureTask", 4096, NULL, 4, NULL, 0);
     xTaskCreatePinnedToCore(httpTask,    "HttpTask",    8192, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(telnetTask,  "TelnetTask",  4096, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(adsTask,     "AdsTask",     4096, NULL, 1, NULL, 1);
     logPrintln("Tareas FreeRTOS creadas. Sistema listo.");
 }
