@@ -50,6 +50,7 @@ void adsTask(void *pvParams) {
     ads_data_t data;
     static float voltaje_filt = 220.0f;
     static float corriente_filt = 0.0f;
+    static uint8_t ciclo = 0;
 
     while (1) {
         float rms_sensor_V = calcular_Canal_RMS(0);
@@ -65,10 +66,16 @@ void adsTask(void *pvParams) {
 
         data.voltaje = voltaje_filt;
         data.corriente = corriente_filt;
-        xQueueSend(adsDataQueue, &data, 0);
 
-        logPrintln("Tensión: " + String(data.voltaje, 1) + "V, Corriente: " + String(data.corriente, 3) + "A");
+        if (ciclo % 15 == 0) {
+            xQueueSend(adsDataQueue, &data, 0);
+        }
 
-        vTaskDelay(pdMS_TO_TICKS(920));
+        if (ciclo % 5 == 0) {
+            logPrintln("Tensión: " + String(data.voltaje, 1) + "V, Corriente: " + String(data.corriente, 3) + "A");
+        }
+
+        ciclo = (ciclo + 1) % 15;
+        vTaskDelay(pdMS_TO_TICKS(120));
     }
 }
