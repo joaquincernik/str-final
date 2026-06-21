@@ -5,12 +5,13 @@
 #include <Adafruit_ADS1X15.h>
 
 #define FACTOR_VOLTAJE   513.6945800781f
-#define FACTOR_CORRIENTE 11.1f
+#define FACTOR_CORRIENTE 0.0916f
 
 static Adafruit_ADS1115 ads;
 
 void initAds() {
     Wire.begin(15, 14);
+    Wire.setClock(400000);
     delay(10);
     if (!ads.begin(0x48)) {
         logPrintln("ERROR: ADS1115 no detectado en 0x48");
@@ -18,32 +19,30 @@ void initAds() {
         logPrintln("ADS1115 detectado en 0x48");
         ads.setGain(GAIN_TWOTHIRDS);
         ads.setDataRate(RATE_ADS1115_860SPS);
-        logPrintln("ADS1115: PGA ±4.096V, 860SPS");
     }
 }
 
 static float calcular_RMS(uint8_t canal) {
+    int32_t t0 = micros();
     float Vsum = 0.0f;
     uint32_t conteo = 0;
-    uint32_t t0 = millis();
-    while (millis() - t0 < 20) {
+
+    while (micros() - t0 < 20000) {
         Vsum += ads.computeVolts(ads.readADC_SingleEnded(canal));
         conteo++;
     }
     if (conteo == 0) return 0.0f;
     float zeroPoint = Vsum / conteo;
-    taskYIELD();
 
+    t0 = micros();
     double sum_sq = 0.0;
     conteo = 0;
-    t0 = millis();
-    while (millis() - t0 < 20) {
+    while (micros() - t0 < 20000) {
         float v = ads.computeVolts(ads.readADC_SingleEnded(canal)) - zeroPoint;
         sum_sq += (double)(v * v);
         conteo++;
     }
     if (conteo == 0) return 0.0f;
-    taskYIELD();
 
     return sqrtf((float)(sum_sq / conteo));
 }
@@ -59,14 +58,11 @@ void adsTask(void *pvParams) {
         float rms_sensor_A = calcular_RMS(1);
 
         float tension_instantanea = rms_sensor_V * FACTOR_VOLTAJE;
-        float corriente_instantanea = rms_sensor_A * FACTOR_CORRIENTE;
+        float corriente_instantanea = rms_sensor_A / FACTOR_CORRIENTE;
+        voltaje_filt = 0.6f * voltaje_filt + 0.4f * tension_instantanea;
+        corriente_filt = 0.6f * corriente_filt + 0.4f * corriente_instantanea;
 
-    /*    voltaje_filt = 0.8f * voltaje_filt + 0.2f * tension_instantanea;
-        corriente_filt = 0.8f * corriente_filt + 0.2f * corriente_instantanea;
-*/
-  voltaje_filt = tension_instantanea;
-        corriente_filt = corriente_instantanea;
-        if (corriente_filt < 0.008f) corriente_filt = 0.0f;
+        if (corriente_filt < 0.015f) corriente_filt = 0.0f;
 
         data.voltaje = voltaje_filt;
         data.corriente = corriente_filt;

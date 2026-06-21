@@ -93,6 +93,8 @@ void setup() {
     logPrintln("Iniciando ESP32-CAM FreeRTOS...");
 
     initWiFi();
+    logPrintln("Esperando 5s antes de iniciar sensores...");
+    delay(5000);
     initCamera();
     initTelnetServer();
     initAds();
