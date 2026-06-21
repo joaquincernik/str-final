@@ -5,13 +5,13 @@
 static ESPTelnetStream telnet;
 
 void logPrint(const String &msg) {
-    Serial.print(msg);
     telnet.print(msg);
+    Serial.print(msg);
 }
 
 void logPrintln(const String &msg) {
-    Serial.println(msg);
     telnet.println(msg);
+    Serial.println(msg);
 }
 
 void initTelnetServer() {
