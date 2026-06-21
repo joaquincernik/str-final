@@ -4,7 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 
-#define FACTOR_VOLTAJE   680.0f
+#define FACTOR_VOLTAJE   513.6945800781f
 #define FACTOR_CORRIENTE 11.1f
 
 static Adafruit_ADS1115 ads;
@@ -13,12 +13,12 @@ void initAds() {
     Wire.begin(15, 14);
     delay(10);
     if (!ads.begin(0x48)) {
-        logPrintln("ERROR: ADS1115 no detectado en 0x48");
+        logPrintln("ERROR: ADS1115 no detectado ");
     } else {
-        logPrintln("ADS1115 detectado en 0x48");
-        ads.setGain(GAIN_ONE);
+        logPrintln("ADS1115 detectado ");
+        ads.setGain(GAIN_TWOTHIRDS);
         ads.setDataRate(RATE_ADS1115_860SPS);
-        logPrintln("ADS1115: PGA ±4.096V, 860SPS");
+       // logPrintln("ADS1115: PGA ±4.096V, 860SPS");
     }
 }
 
@@ -52,9 +52,11 @@ void adsTask(void *pvParams) {
         float tension_instantanea = rms_sensor_V * FACTOR_VOLTAJE;
         float corriente_instantanea = rms_sensor_A * FACTOR_CORRIENTE;
 
-        voltaje_filt = 0.8f * voltaje_filt + 0.2f * tension_instantanea;
+    /*    voltaje_filt = 0.8f * voltaje_filt + 0.2f * tension_instantanea;
         corriente_filt = 0.8f * corriente_filt + 0.2f * corriente_instantanea;
-
+*/
+  voltaje_filt = tension_instantanea;
+        corriente_filt = corriente_instantanea;
         if (corriente_filt < 0.008f) corriente_filt = 0.0f;
 
         data.voltaje = voltaje_filt;
