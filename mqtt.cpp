@@ -15,10 +15,13 @@ static void mqttCallback(char* topic, uint8_t* payload, unsigned int length) {
         String msg = "";
         for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
         if (msg == "1") {
+            digitalWrite(ENABLE_PIN, HIGH);
+            delay(50);
             digitalWrite(RELAY_PIN, RELAY_ON);
             logPrintln("Relé: ENCENDIDO por MQTT");
         } else {
             digitalWrite(RELAY_PIN, RELAY_OFF);
+            digitalWrite(ENABLE_PIN, LOW);
             logPrintln("Relé: APAGADO por MQTT");
         }
     }
@@ -27,9 +30,11 @@ static void mqttCallback(char* topic, uint8_t* payload, unsigned int length) {
 void mqttTask(void *pvParams) {
     sensor_event_t evt;
 
+    pinMode(ENABLE_PIN, OUTPUT);
+    digitalWrite(ENABLE_PIN, LOW);
     pinMode(RELAY_PIN, OUTPUT);
     digitalWrite(RELAY_PIN, RELAY_OFF);
-    logPrintln("Relé inicializado (APAGADO)");
+    logPrintln("Relé + Convertidor inicializados (APAGADO)");
 
     uint8_t mac[6];
     WiFi.macAddress(mac);

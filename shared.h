@@ -8,6 +8,7 @@
 
 #define SENSOR_PIN 1
 
+#define ENABLE_PIN 13
 #define RELAY_PIN 3
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
