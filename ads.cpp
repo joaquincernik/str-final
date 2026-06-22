@@ -54,7 +54,7 @@ void adsTask(void *pvParams) {
 
     while (1) {
         float rms_sensor_V = calcular_RMS(0);
-        taskYIELD();
+        taskYIELD(); //cede el paso para que otras tareas se ejecuten, particularmente los logs en telnet y demas
         float rms_sensor_A = calcular_RMS(1);
 
         float tension_instantanea = rms_sensor_V * FACTOR_VOLTAJE;

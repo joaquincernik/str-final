@@ -16,8 +16,8 @@ QueueHandle_t adsDataQueue = NULL;
 static void IRAM_ATTR sensor_isr() {
     BaseType_t higherTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(sensorSemaphore, &higherTaskWoken);
-    if (higherTaskWoken) {
-        portYIELD_FROM_ISR();
+    if (higherTaskWoken) { //significa que se abrio la puerta
+        portYIELD_FROM_ISR();  //despertamos al sensor task
     }
 }
 
@@ -27,7 +27,9 @@ static void sensorTask(void *pvParams) {
     int lastState = -1;
 
     while (1) {
+        //microsegundos -> ticks pdMS_TO_TICKS(1000)
         if (xSemaphoreTake(sensorSemaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+            //esto ocurre solamnte cuando el semaforo nos da la senal , que se genera en la interrupcion
             uint32_t now = millis();
             if (now - lastValidTime < 200) continue;
             lastValidTime = now;
@@ -38,6 +40,8 @@ static void sensorTask(void *pvParams) {
 
             evt.timestamp_ms = now;
             if (xQueueSend(sensorEventQueue, &evt, pdMS_TO_TICKS(100)) != pdTRUE) {
+                //espera 100ms hasta que se libere la cola, si no descarta el evento 
+                //si puede meter el evento a la cola devuelve pdTRUE
                 logPrintln("WARN: sensorEventQueue llena, descartando evento");
             }
             xQueueSend(mqttEventQueue, &evt, pdMS_TO_TICKS(100));
